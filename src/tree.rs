@@ -353,7 +353,7 @@ impl Tree {
     /// assert_eq!(&processed.get(b"k3").unwrap().unwrap(), b"yappin' ligers");
     /// # Ok(()) }
     /// ```
-    pub fn transaction<F, A, E>(
+    pub fn transaction<F, A, E: fmt::Display + fmt::Debug>(
         &self,
         f: F,
     ) -> transaction::TransactionResult<A, E>

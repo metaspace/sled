@@ -140,7 +140,9 @@ impl From<Error> for UnabortableTransactionError {
     }
 }
 
-impl<E> From<UnabortableTransactionError> for ConflictableTransactionError<E> {
+impl<E: fmt::Display + fmt::Debug> From<UnabortableTransactionError>
+    for ConflictableTransactionError<E>
+{
     fn from(error: UnabortableTransactionError) -> Self {
         match error {
             UnabortableTransactionError::Conflict => {
@@ -156,7 +158,7 @@ impl<E> From<UnabortableTransactionError> for ConflictableTransactionError<E> {
 /// An error type that is returned from the closure
 /// passed to the `transaction` method.
 #[derive(Debug, Clone, PartialEq)]
-pub enum ConflictableTransactionError<T = Error> {
+pub enum ConflictableTransactionError<T: fmt::Debug + fmt::Display + Sized> {
     /// A user-provided error type that indicates the transaction should abort.
     /// This is passed into the return value of `transaction` as a direct Err
     /// instance, rather than forcing users to interact with this enum
@@ -174,18 +176,20 @@ pub enum ConflictableTransactionError<T = Error> {
     Storage(Error),
 }
 
-impl<E: fmt::Display> fmt::Display for ConflictableTransactionError<E> {
+impl<E: fmt::Debug + fmt::Display> fmt::Display
+    for ConflictableTransactionError<E>
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use ConflictableTransactionError::*;
         match self {
-            Abort(e) => e.fmt(f),
+            Abort(e) => std::fmt::Display::fmt(&e, f),
             Conflict => write!(f, "Conflict during transaction"),
             Storage(e) => e.fmt(f),
         }
     }
 }
 
-impl<E: std::error::Error> std::error::Error
+impl<E: fmt::Debug + fmt::Display> std::error::Error
     for ConflictableTransactionError<E>
 {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
@@ -221,7 +225,7 @@ impl<E: fmt::Display> fmt::Display for TransactionError<E> {
     }
 }
 
-impl<E: std::error::Error> std::error::Error for TransactionError<E> {
+impl<E: fmt::Display + fmt::Debug> std::error::Error for TransactionError<E> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             TransactionError::Storage(ref e) => Some(e),
@@ -235,7 +239,9 @@ impl<E: std::error::Error> std::error::Error for TransactionError<E> {
 pub type ConflictableTransactionResult<T, E = ()> =
     std::result::Result<T, ConflictableTransactionError<E>>;
 
-impl<T> From<Error> for ConflictableTransactionError<T> {
+impl<T: fmt::Display + fmt::Debug> From<Error>
+    for ConflictableTransactionError<T>
+{
     fn from(error: Error) -> Self {
         ConflictableTransactionError::Storage(error)
     }
@@ -433,7 +439,9 @@ impl TransactionalTrees {
 }
 
 /// A simple constructor for `Err(TransactionError::Abort(_))`
-pub const fn abort<A, T>(t: T) -> ConflictableTransactionResult<A, T> {
+pub fn abort<A, T: fmt::Display + fmt::Debug>(
+    t: T,
+) -> ConflictableTransactionResult<A, T> {
     Err(ConflictableTransactionError::Abort(t))
 }
 
@@ -458,6 +466,7 @@ pub trait Transactional<E = ()> {
     /// you're most likely to use directly.
     fn transaction<F, A>(&self, f: F) -> TransactionResult<A, E>
     where
+        E: fmt::Display + fmt::Debug,
         F: Fn(&Self::View) -> ConflictableTransactionResult<A, E>,
     {
         loop {
